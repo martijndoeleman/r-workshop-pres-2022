@@ -51,22 +51,11 @@ If you got the message `You're good to go!`, proceed by running the following co
 rm(list = ls())
 
 # Load required packages
+require(tidyverse)
+require(modelr)
+require(readxl)
+require(lmtest)
 
-## required packages
-required_packages <- c('tidyverse', 'modelr', 'readxl', 'lmtest')
-
-## for-loop to check if package is installed, installs required package when it is not yet installed
-for (package in required_packages) { 
-  if (require(package, character.only = TRUE, quietly = TRUE)) {
-    library(package, character.only = TRUE, quietly = TRUE)
-    print(paste0(package, " package loaded"))
-  } else {
-    install.packages(package, quiet = TRUE, dependencies = TRUE)
-    library(package, character.only = TRUE, quietly = TRUE)
-    print(paste0(package, " package loaded"))
-  }
-  }
-  
 ```
 
 Thereafter, load the dataset `simulated data.xlsx` and its data dictionary in your working environment by running the following code:
@@ -377,8 +366,7 @@ ggplot(aes(x = subtype, y = lim, fill = subtype)) +
   * Create a boxplot of age per JIA subtype using scale_fill_nejm() (inspired by *The New England Journal of Medicine*)
   
 ```{r message=FALSE, warning=FALSE}
-# install.packages("ggsci")
-library(ggsci)
+require(ggsci)
 
 db %>%
   mutate(age = as.numeric(age)) %>%
@@ -597,7 +585,7 @@ summary(mod_logistic)
 * **Exercise `r exercise_number()`:** Try out the functions of the `broom` package `glance()`, `tidy()`, and `augment()` on the previously created logistic regression model and take a look at their output. What does each function do? (**NB:** Remember to first install the broom package with `install.packages('broom')` and then load it via `library(broom)`
 
 ```{r}
-library(broom)
+require(broom)
 glance(mod_logistic)
 ```
 

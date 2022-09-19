@@ -51,21 +51,10 @@ If you got the message `You're good to go!`, proceed by running the following co
 rm(list = ls())
 
 # Load required packages
-
-## required packages
-required_packages <- c('tidyverse', 'modelr', 'readxl', 'lmtest')
-
-## for-loop to check if package is installed, installs required package when it is not yet installed
-for (package in required_packages) { 
-  if (require(package, character.only = TRUE, quietly = TRUE)) {
-    library(package, character.only = TRUE, quietly = TRUE)
-    print(paste0(package, " package loaded"))
-  } else {
-    install.packages(package, quiet = TRUE, dependencies = TRUE)
-    library(package, character.only = TRUE, quietly = TRUE)
-    print(paste0(package, " package loaded"))
-  }
-  }
+require(tidyverse)
+require(modelr)
+require(readxl)
+require(lmtest)
   
 ```
 
@@ -221,8 +210,7 @@ What's the difference between `db_pivot_longer` and `db_reshape`? (Hint: check t
   * Create a boxplot of age per JIA subtype using scale_fill_nejm() (inspired by *The New England Journal of Medicine*)
   
 ```{r message=FALSE, warning=FALSE}
-# install.packages("ggsci")
-library(ggsci)
+require(ggsci)
 
 # Create boxplot
 
@@ -530,7 +518,7 @@ ggplot(data = db_linearity_lim, aes(x = median_lim, y = logit)) +
 * Check influential observations / outliers
 
 ```{r}
-
+require(broom)
 model_data <- augment(model)
 
 # Cook's distance
