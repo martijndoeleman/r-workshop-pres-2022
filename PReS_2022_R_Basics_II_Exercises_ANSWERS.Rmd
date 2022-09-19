@@ -159,14 +159,14 @@ summarise(db_select, mean = mean(jadas, na.rm = TRUE),
 
 * **Exercise `r exercise_number()`:** Perform the following operations on data frame `db` using the pipe operator and store the result in `db_pipe`
 
-* *Select* columns `id`, `sex`, `age`, `active`, `lim`
-* *Mutate* `sex` to a categorical variable
-* *Mutate* `age`, `active`, and `lim` to numeric variables
-* *Group* the data by `sex`
-* *Summarise* mean and standard deviation of `age`, `active`, and `lim`
-* *Arrange* the data frame by mean number of active joints
-* Remember to `ungroup()` your data frame / tibble at the end
-* Print the resulting summary
+  * *Select* columns `id`, `sex`, `age`, `active`, `lim`
+  * *Mutate* `sex` to a categorical variable
+  * *Mutate* `age`, `active`, and `lim` to numeric variables
+  * *Group* the data by `sex`
+  * *Summarise* mean and standard deviation of `age`, `active`, and `lim`
+  * *Arrange* the data frame by mean number of active joints
+  * Remember to `ungroup()` your data frame / tibble at the end
+  * Print the resulting summary
 
 ```{r}
 db_pipe <- db %>%
@@ -361,6 +361,7 @@ ggplot(aes(x = subtype, y = lim, fill = subtype)) +
 ### Scientific colours
 
 **Exercise `r exercise_number()`:** The `ggsci` package contains colour palettes inspired by scientific journals (and Sci-Fi) for ggplot2.
+
   * Install the `ggsci` package using `install.packages('ggsci')`
   * Load the package with `library(ggsci)`
   * Create a boxplot of age per JIA subtype using scale_fill_nejm() (inspired by *The New England Journal of Medicine*)
@@ -532,11 +533,11 @@ ggplot(db_regression, aes(x = pred_active, y = lim)) +
 
 * **Exercise `r exercise_number()`:** Test the hypothesis that the relationship between active and limited joints is different for each JIA subtype. Perform the following steps:
 
-* Fit a linear model on the number of active joints, using the number of limited joints as predictor
-* Fit a second model on the number of active joints, using an interaction between the number of limited joints and the JIA subtypes as predictor (you can add independent effects and interactions by using an **asterisk (*)** between two variables)
-* Check model characteristics for both models
-* Test for differences using the Likelihood Ratio Test
-* What is the answer?
+  * Fit a linear model on the number of active joints, using the number of limited joints as predictor
+  * Fit a second model on the number of active joints, using an interaction between the number of limited joints and the JIA subtypes as predictor (you can add independent effects and interactions by using an **asterisk (*)** between two variables)
+  * Check model characteristics for both models
+  * Test for differences using the Likelihood Ratio Test
+  * What is the answer?
 
 ```{r}
 
@@ -859,6 +860,3 @@ confusionMatrix(confusion_table$pred_class, reference = confusion_table$obs_clas
                 positive = "inactive") 
 
 ```
-                
-                
-        
