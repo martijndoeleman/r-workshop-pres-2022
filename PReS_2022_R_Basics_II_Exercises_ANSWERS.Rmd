@@ -1,0 +1,876 @@
+---
+title: "PReS 2022 - R Basics II"
+author: "M.J.H. Doeleman & E.H.P. van Dijkhuizen"
+date: "20 September 2022"
+output:
+  html_document:
+    theme: readable
+    highlight: haddock
+    toc: true
+    number_sections: false
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# R Markdown {-}
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and Microsoft Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+For awesome examples of R Markdown documents and much more, visit <https://rmarkdown.rstudio.com/gallery>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+print("This will print inside the document when knitted!")
+```
+
+# Setup {-}
+
+Before we begin with the exercises, please make sure the simulated dataset `simulated data.xlsx` and this R Markdown document are in the same folder on your computer/laptop. To check this, please run the following code:
+
+```{r}
+
+if (length(list.files(pattern = 'simulated data.xlsx')) < 1) {
+  print("Please put this document and 'simulated data.xlsx' in the same folder on your computer or laptop!")
+} else {
+  print("You're good to go!")
+}
+
+```
+
+If you got the message `You're good to go!`, proceed by running the following code chunk to clear your working environment and load the required libraries for the exercises:
+
+```{r message=FALSE, warning=FALSE}
+# Clear your working environment
+rm(list = ls())
+
+# Load required packages
+
+## required packages
+required_packages <- c('tidyverse', 'modelr', 'readxl', 'lmtest')
+
+## for-loop to check if package is installed, installs required package when it is not yet installed
+for (package in required_packages) { 
+  if (require(package, character.only = TRUE, quietly = TRUE)) {
+    library(package, character.only = TRUE, quietly = TRUE)
+    print(paste0(package, " package loaded"))
+  } else {
+    install.packages(package, quiet = TRUE, dependencies = TRUE)
+    library(package, character.only = TRUE, quietly = TRUE)
+    print(paste0(package, " package loaded"))
+  }
+  }
+  
+```
+
+Thereafter, load the dataset `simulated data.xlsx` and its data dictionary in your working environment by running the following code:
+
+```{r}
+
+# Load simulated dataset
+db <- read_excel('simulated data.xlsx', sheet = 1, col_types = 'text') 
+
+# Load data dictionary
+data_dictionary <- read_excel('simulated data.xlsx', sheet = 2)
+
+
+```
+
+# Exercises
+
+```{r echo=FALSE}
+# Variable exercise number
+number = 0
+
+# Function for numbering the exercises
+exercise_number <- function() {
+  assign("number", number + 1, envir = .GlobalEnv)
+  return(number)
+}
+
+```
+
+## dplyr - Data Manipulation
+
+### Basics
+
+Perform the following operations with dplyr:
+
+* **Exercise `r exercise_number()`:** *Select* baseline variables (`id` until `VASwb`) from `db` and store the result in `db_select`
+
+```{r}
+db_select <- db %>% select(id:VASwb)
+```
+
+* **Exercise `r exercise_number()`:** Catch a *glimpse* of the dataset `db_select`
+
+```{r}
+glimpse(db_select)
+```
+
+* **Exercise `r exercise_number()`:** Coerce the variables `esr`, `active`, `pga`, and `VASwb` from `db_select` to numeric values (remember to store the result)
+
+```{r}
+
+# Coerce variables to numeric using mutate
+db_select <- mutate(db_select, esr = as.numeric(esr))
+db_select <- mutate(db_select, active = as.numeric(active))
+db_select <- mutate(db_select, pga = as.numeric(pga))
+db_select <- mutate(db_select, VASwb = as.numeric(VASwb))
+
+```
+
+* **Exercise `r exercise_number()`:** Create a new variable `JADAS` in the tibble (data frame) `db_select`. Remember, JADAS consists of:
+  * Normalized ESR
+    * ESR <20 = 0
+    * ESR 0-120 = (ESR-20 / 10)
+    * ESR >120 = 10
+  * PGA (0-10)
+  * Active Joint Count
+  * VAS Well-Being (0-10)
+
+```{r}
+
+# Create normalized ESR value using if-else statements
+db_select <- mutate(db_select, normalized_esr = if_else(
+  esr < 20, 0, if_else(
+    esr > 120, 10, (esr-20) / 10
+  )
+))
+
+# Calculate JADAS
+db_select <- mutate(db_select, jadas = normalized_esr + pga + active + VASwb)
+
+```
+
+* **Exercise `r exercise_number()`:**
+  * Coerce the variable `subtype` to factor (categorical)
+  * Create a *summary* of the JADAS mean and standard deviation *grouped by* `subtype` and print the result
+
+```{r}
+# First coerce subtype to factor
+db_select <- mutate(db_select, subtype = as.factor(subtype))
+
+# Create a summary
+db_select <- group_by(db_select, subtype)
+summarise(db_select, mean = mean(jadas, na.rm = TRUE),
+          sd = sd(jadas, na.rm = TRUE),
+          number_of_patients = n(),
+          missing_jadas = sum(is.na(jadas)))
+
+```
+
+### The pipe operator
+
+* **Exercise `r exercise_number()`:** Perform the following operations on data frame `db` using the pipe operator and store the result in `db_pipe`
+
+* *Select* columns `id`, `sex`, `age`, `active`, `lim`
+* *Mutate* `sex` to a categorical variable
+* *Mutate* `age`, `active`, and `lim` to numeric variables
+* *Group* the data by `sex`
+* *Summarise* mean and standard deviation of `age`, `active`, and `lim`
+* *Arrange* the data frame by mean number of active joints
+* Remember to `ungroup()` your data frame / tibble at the end
+* Print the resulting summary
+
+```{r}
+db_pipe <- db %>%
+  select(id, sex, age, active, lim) %>%
+  mutate(sex = as.factor(sex)) %>%
+  mutate(across(c(age, active, lim), as.numeric)) %>%
+  group_by(sex) %>%
+  summarise(across(c(age, active, lim), list(mean = mean, sd = sd),
+                   na.rm = TRUE)) %>%
+  arrange(active_mean) %>%
+  ungroup()
+
+print(db_pipe)
+```
+
+### Pivoting (long and wide data)
+
+The dataset `db` is not a tidy dataset. Several variables are split across multiple columns and one row contains values for different time points. We can make our analysis (and therefore lifes) easier by `pivoting` the dataset and convert the data to a long format.
+
+* **Exercise `r exercise_number()`:** Select columns `id`, `sex`, `age`, `active`, `active6`, store them in a data frame `db_pivot` and make the dataset longer
+  * Store the names in a column `time` and the values in a column `active`
+  
+```{r}
+
+db_pivot <- db %>%
+  select(id, sex, age, active, active6) %>%
+  pivot_longer(c(active, active6), names_to = 'time', values_to = 'active')
+
+```
+
+* **Exercise `r exercise_number()`:** Try to compare the mean number of active joints in `db_pivot` between the two timepoints. Does the mean number of active joints increase or decrease over time? Tidy data makes comparisons between groups a lot easier.
+
+```{r}
+
+db_pivot %>%
+  group_by(time) %>%
+  summarise(mean = mean(as.numeric(active), na.rm = T))
+
+```
+
+### Joining data frames
+
+The package `dplyr` contains a family of `Join()`-functions. These functions aim to join two different data frames in several ways, depending on the specific join function. 
+
+* **Exercise `r exercise_number()`:** Suppose new data is collected for our simulated patients which is stored in a different dataset `db_new`. This dataset contains new long-term outcomes at 36 months. Run the code below to create `db_new`.
+
+```{r}
+db_new <- data.frame(
+  id = as.character(seq(from = 1, to = 1001, by = 1)),
+  outcome36 = rbinom(n = 1001, size = 1, prob = 0.7),
+  age = c(as.numeric(db$age) + 1, NA)
+)
+```
+
+* **Exercise `r exercise_number()`:** Join data frame `db_new` to the data frame `db` using the `id` column -> Store the result in `db_join`
+  * NB: There seems to be one additional patient in `db_new` who was not present in `db`
+  * We make the assumption that this patient was added by accident
+  * Therefore, join data frames using a `join`-function keeping all observations from `db` but removing those from `db_new` not present in `db`
+
+```{r}
+db_join <- db %>%
+  left_join(db_new, by = 'id')
+```
+
+* **Exercise `r exercise_number()`:** Check the column names of the resulting data frame. Does anything stand out?
+  * When the `join`-function encounters two variables with identical names, a suffix is added. Default suffix is `.x` for data on the left-hand side (LHS) and `.y` for data on the right-hand side (RHS)
+
+```{r}
+colnames(db_join)
+# Answer: There are two age-related columns age.x from db data frame and age.y from db_new.
+```
+
+* **Exercise `r exercise_number()`:** You decide that you want a dataset with all observations from both `db` and `db_new` after all.
+  * Which join do you need to perform to keep all observations from both tibbles?
+  * Does the order of the data frames matter?
+  
+```{r}
+db_join <- db %>%
+  select(-age) %>%
+  full_join(db_new, by = 'id')
+
+db_join_2 <- db_new %>%
+  full_join(db, by = "id")
+```
+
+### Advanced Pivoting with Reshape
+
+Although the pivot-functions from the `dplyr` package have a relatively easy-to-understand syntax, untidy time series data (where multiple groups of variables need to be transformed) is sometimes easier to tidy with the `reshape()` function. See the difference between `pivot_longer()` and `reshape()` below:
+
+```{r}
+
+db_pivot_longer <- db %>%
+  pivot_longer(c(outcome6, outcome12, outcome18, outcome24), names_to = c('measure', 'timepoint'), names_pattern = "([A-Za-z]+)(\\d+)",
+               values_to = 'outcome') %>%
+  pivot_longer(c(time6, time12, time18, time24), names_to = c('variable', 'timepoint2'), names_pattern = "([A-Za-z]+)(\\d+)",
+               values_to = 'time') %>%
+  filter(timepoint == timepoint2) %>%
+  select(-c(measure, timepoint2, variable))
+
+db_reshape <- as.data.frame(db) %>%
+  reshape(varying = list(c("time6", "time12", "time18", "time24"),
+                         c("outcome6", "outcome12", "outcome18", "outcome24")),
+          v.names = c("time", "outcome"),
+          timevar = "timepoint",
+          direction = "long") %>%
+  arrange(as.numeric(id))
+
+print(db_pivot_longer)
+
+print(head(db_reshape))
+
+```
+
+What's the difference between `db_pivot_longer` and `db_reshape`? (Hint: check the rownames of both data frames)
+
+## ggplot2 - Data visualisation
+
+### Basics
+
+* **Exercise `r exercise_number()`:** Create a scatter plot (`geom_point`) with:
+  * PGA on the x-axis
+  * Number of active joints on the y-axis
+  * Different colour per JIA subtype
+  * Different symbol / shape for each sex
+  * Set x- and y-axis limits (hint: ?scale_x_continuous)
+  * Create an appropriate title and axis labels 
+  
+* NB: don't forget to coerce numeric variables to numeric and categorical variables to factor(!)
+  * Bonus: Set factor-level labels to improve your plot
+
+```{r}
+
+db %>%
+  mutate(across(c(pga, active), as.numeric)) %>%
+  mutate(sex = factor(sex, levels = c("1", "2"), labels = c("male", "female"))) %>%
+  mutate(subtype = factor(subtype, levels = as.character(c(1:6)), 
+                          labels = c("oligo JIA",
+                                     "poly JIA RF+",
+                                     "poly JIA RF-",
+                                     "ERA",
+                                     "Psoriatic",
+                                     "Undifferentiated"))) %>%
+  ggplot(aes(x = pga, y = active, colour = subtype, shape = sex)) +
+    geom_point() +
+    scale_x_continuous(name = 'PGA', limits = c(0, 10)) +
+    scale_y_continuous(name = "Number of active joints", limits = c(0,50)) +
+    scale_shape_discrete(name = "Sex") +
+    scale_color_discrete(name = "JIA Subtype") +
+    labs(title = "Number of active joints and PGA across JIA subtypes and sex") +
+    theme_bw()
+
+```
+
+* **Exercise `r exercise_number()`:** Create a histogram of ESR. Set binwidth = 5
+  * Bonus: Create appropriate title and axis-labels
+
+```{r}
+
+ggplot(db, aes(x = as.numeric(esr))) +
+  geom_histogram(binwidth = 5, fill = "darkblue") +
+  scale_x_continuous(name = "ESR") +
+  scale_y_continuous(name = "Frequency") +
+  theme_bw()
+
+```
+
+* **Exercise `r exercise_number()`:** Create a `boxplot` of number of limited joints per JIA subtype (colour the boxplot differently per JIA subtype)
+  * NB: don't forget to coerce numeric variables to numeric and categorical variables to factor(!)
+  * Bonus: Set title, axis-labels, and legend titles
+  
+```{r}
+
+db %>%
+  mutate(lim = as.numeric(lim)) %>%
+  mutate(subtype = factor(subtype, levels = as.character(c(1:6)), 
+                          labels = c("oligo JIA",
+                                     "poly JIA RF+",
+                                     "poly JIA RF-",
+                                     "ERA",
+                                     "Psoriatic",
+                                     "Undifferentiated"))) %>%
+ggplot(aes(x = subtype, y = lim, fill = subtype)) +
+  geom_boxplot() +
+  scale_x_discrete(name = "JIA Subtype") +
+  scale_fill_discrete(name = "JIA Subtype") +
+  scale_y_continuous(name = "Number of limited joints") +
+  ggtitle("Median number of limited joints per subtype") +
+  theme_bw()
+  
+```
+
+### Scientific colours
+
+**Exercise `r exercise_number()`:** The `ggsci` package contains colour palettes inspired by scientific journals (and Sci-Fi) for ggplot2.
+  * Install the `ggsci` package using `install.packages('ggsci')`
+  * Load the package with `library(ggsci)`
+  * Create a boxplot of age per JIA subtype using scale_fill_nejm() (inspired by *The New England Journal of Medicine*)
+  
+```{r message=FALSE, warning=FALSE}
+# install.packages("ggsci")
+library(ggsci)
+
+db %>%
+  mutate(age = as.numeric(age)) %>%
+  mutate(subtype = factor(subtype, levels = as.character(c(1:6)), 
+                          labels = c("oligo JIA",
+                                     "poly JIA RF+",
+                                     "poly JIA RF-",
+                                     "ERA",
+                                     "Psoriatic",
+                                     "Undifferentiated"))) %>%
+ggplot(aes(x = subtype, y = age, fill = subtype)) +
+  geom_boxplot() +
+  scale_x_discrete(name = "JIA Subtype") +
+  scale_fill_nejm(name = "JIA Subtype") +
+  scale_y_continuous(name = "Age (in years)") +
+  ggtitle("Median number of limited joints per subtype") +
+  theme_bw()
+
+
+```
+
+### Facets
+
+ggplot provides a way to separate plots into multiple panels based on specific variables:
+
+  * `facet_wrap()` wraps panels so they fit the screen best (can be specified using *ncol* or *nrow*)
+  * `facet_grid()` creates a grid of panels, organised like a table.
+
+```{r message = FALSE, warning=FALSE}
+
+# Example: Active vs. Limited joints with different panels per subtype
+
+db %>%
+  mutate(across(c(age, active, lim), as.numeric)) %>%
+  mutate(subtype = factor(subtype, levels = as.character(c(1:6)), 
+                          labels = c("oligo JIA",
+                                     "poly JIA RF+",
+                                     "poly JIA RF-",
+                                     "ERA",
+                                     "Psoriatic",
+                                     "Undifferentiated"))) %>%
+ggplot(aes(x = active, y = lim, color = subtype)) +
+  geom_point() +
+  scale_x_continuous(name = "Number of active joints") +
+  scale_y_continuous(name = "Number of limited joints") +
+  scale_color_nejm() +
+  ggtitle("Relation of active and limited joints per JIA subtype") +
+  facet_wrap(~subtype, nrow = 2, scales = "free") +
+  theme_bw()
+
+
+```
+
+### Theme and Saving plots
+
+the styling of all components of a ggplot can be modified using the `theme()` function. There are seven built-in themes available:
+
+* `theme_grey()` (default)
+* `theme_bw()`
+* `theme_classic()`
+* `theme_minimal()`
+* `theme_linedraw()`
+* `theme_light()`
+* `theme_dark()`
+* `theme_void()`
+
+See `?theme` for an overview of all modifiable ggplot elements. All elements use an inheritance structure (i.e. changing a *parent* element affects all *children* which inherit from that element).
+
+**Example:** `axis.title` affects all axis title elements of a ggplot, while `axis.title.y` only affects the y-axis.
+
+Elements can be changed by using this syntax: `theme(element.name = element_function())`.
+
+There are four types of `element_functions()`:
+
+* `element_text()` draws labels and headings
+* `element_line()` draws lines (e.g. grid lines) parameterised by colour, size, and linetype
+* `element_rect()` draws rectangles (mostly used for backgrounds), paremeterised by fill, colour, size, and linetype
+* `element_blank()` draws nothing (effectively removes the element from the plot)
+
+<br/>
+
+* **Exercise `r exercise_number()`:** Create a ggplot with the following properties:
+  * Create a scatterplot of active joints (x-axis) versus VAS well-being (y-axis)
+  * Create a colour gradient for PGA with `scale_colour_gradient` ranging from *deepskyblue* for low values, *white* for medium values, and *firebrick* for high values
+  * Add random jitter with `position = position_jitter()` to visualise overlapping data points
+  * Add title and axis labels
+  * Set theme to `theme_minimal()`
+  * Set titles and axis labels to **bold**
+  * Set background fill and colour to *gray98*
+ 
+```{r}
+
+db %>%
+  mutate(across(c(pga, active, VASwb), as.numeric)) %>%
+  ggplot(aes(x = active, y = VASwb, colour = pga)) +
+  geom_point(position = position_jitter()) +
+  scale_colour_gradient2(name = "PGA",
+                         low = "deepskyblue",
+                         mid = "white",
+                         high = "firebrick",
+                         midpoint = 5) +
+  labs(x = "Number of active joints",
+       y = "VAS Well-Being",
+       title = "Active Joints vs. VAS Well-Being") +
+  theme_minimal() +
+  theme(title = element_text(face = "bold"), axis.title = element_text(face = "bold"),
+        plot.background = element_rect(fill = "gray98", colour = "gray98"))
+
+```
+
+
+## Linear / Logistic Regression
+
+* **Exercise `r exercise_number()`:** Create a simple univariate linear regression model of two variables in the dataset and show relevant model characteristics.
+
+```{r}
+
+db_regression <- db %>%
+  mutate(across(c(active, lim), as.numeric))
+
+mod_uni <- lm(active ~ lim, data = db_regression)
+
+summary(mod_uni)
+
+```
+
+
+* **Exercise `r exercise_number()`:** Create a sligthly more complex model explaining the number of limited joints by active joints, pga, esr, VASwb and sex and show relevant model characteristics. Look at the coefficient for sex. What does this mean?
+
+```{r}
+db_regression <- db %>%
+  mutate(across(c(active, lim, pga, esr, VASwb), as.numeric)) %>%
+  mutate(sex = factor(sex))
+
+mod_multi <- lm(lim ~ active + pga + esr + VASwb + sex, data = db_regression)
+
+summary(mod_multi)
+
+```
+
+* **Exercise `r exercise_number()`:** Plot diagnostic plots for your slightly more complex multivariable model
+
+```{r}
+par(mfrow=c(2,2))
+plot(mod_multi)
+```
+
+* **Exercise `r exercise_number()`:** Add predictions for the number of active joints from the multivariable model (x-axis) for all cases and plot these against the observed number of limited joints (y-axis). Add a line for perfect equality *y = x*.
+
+```{r}
+
+db_regression$pred_active <- predict(mod_multi, newdata = db_regression)
+
+ggplot(db_regression, aes(x = pred_active, y = lim)) +
+  geom_point(position = position_jitter()) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  labs(x = "Predicted",
+       y = "Observed",
+       title = "Predicted vs. Observed number of limited joints") +
+  theme_minimal()
+
+```
+
+* **Exercise `r exercise_number()`:** Test the hypothesis that the relationship between active and limited joints is different for each JIA subtype. Perform the following steps:
+
+* Fit a linear model on the number of active joints, using the number of limited joints as predictor
+* Fit a second model on the number of active joints, using an interaction between the number of limited joints and the JIA subtypes as predictor (you can add independent effects and interactions by using an **asterisk (*)** between two variables)
+* Check model characteristics for both models
+* Test for differences using the Likelihood Ratio Test
+* What is the answer?
+
+```{r}
+
+db_regression <- db %>%
+  mutate(across(c(lim, active), as.numeric)) %>%
+   mutate(subtype = factor(subtype, levels = as.character(c(1:6)), 
+                          labels = c("oligo JIA",
+                                     "poly JIA RF+",
+                                     "poly JIA RF-",
+                                     "ERA",
+                                     "Psoriatic",
+                                     "Undifferentiated")))
+
+mod_base <- lm(active ~ lim, data = db_regression)
+mod_interaction <- lm(active ~ lim*subtype, data = db_regression)
+
+summary(mod_base)
+summary(mod_interaction)
+
+lrtest(mod_base, mod_interaction)
+
+```
+
+* **Exercise `r exercise_number()`:** Create a logistic regression of the outcome at 12 months. Use the baseline variables as predictors in the model. See which predictors significantly contribute to the model. Provide confidence intervals and odds ratio's
+
+```{r}
+db_regression <- db %>%
+  select(id:VASwb, outcome6) %>%
+  mutate(across(c(age, active, lim, pga, esr, VASwb), as.numeric)) %>%
+  mutate(sex = factor(sex, levels = c("1", "2"), labels = c("male", "female"))) %>%
+  mutate(subtype = factor(subtype, levels = as.character(c(1:6)), 
+                          labels = c("oligo JIA",
+                                     "poly JIA RF+",
+                                     "poly JIA RF-",
+                                     "ERA",
+                                     "Psoriatic",
+                                     "Undifferentiated"))) %>%
+  mutate(outcome = factor(outcome6))
+
+mod_logistic <- glm(outcome ~ age + active + lim + pga + esr + VASwb + sex + subtype, family = "binomial", data = db_regression)
+summary(mod_logistic)
+
+
+```
+
+* **Exercise `r exercise_number()`:** Try out the functions of the `broom` package `glance()`, `tidy()`, and `augment()` on the previously created logistic regression model and take a look at their output. What does each function do? (**NB:** Remember to first install the broom package with `install.packages('broom')` and then load it via `library(broom)`
+
+```{r}
+library(broom)
+glance(mod_logistic)
+```
+
+```{r}
+tidy(mod_logistic)
+```
+
+```{r}
+augment(mod_logistic, newdata = db_regression)
+```
+
+
+# Full Data Analysis (Bonus)
+
+Now it's time to do a full data analysis on the dataset!
+
+The exercises below will guide you through the following steps:
+
+1. Inspect the dataset
+2. Create a baseline table
+3. Build a model to predict the outcome at 6 months
+4. Check some model assumptions
+5. Create confusion matrix of model predictions
+
+First, clear your working environment with the following code:
+
+```{r}
+rm(list = ls())
+```
+
+* Inspect the data:
+  * Load the data and data dictionary
+  * Inspect rows and columns
+  * Coerce all columns to the correct data type
+  * How many patients or observations are in the dataset?
+  * How many variables have been collected?
+  * Are there any missing values? If so, how many? Which variables?
+    * Tip: visualise number of missing values for each variable in a bar graph
+
+```{r}
+
+# Load the data
+db <- read_excel("simulated data.xlsx", col_types = "text", sheet = 1)
+data_dictionary <- read_excel("simulated data.xlsx", col_types = "text", sheet = 2)
+
+```
+
+```{r}
+
+# Inspect number of rows and columns
+dim(db)
+
+# Inspect the dataset
+glimpse(db)
+
+```
+
+```{r}
+
+# Coerce columns to correct data type
+db_correct <- db %>%
+  mutate(across(c(age, active, lim, pga, esr, VASwb, time6, active6, pga6, esr6, VASwb6, time12, time18, time24), as.numeric)) %>%
+  mutate(sex = factor(sex, levels = c("1", "2"), labels = c("male", "female"))) %>%
+  mutate(subtype = factor(subtype, levels = as.character(c(1:6)), 
+                          labels = c("oligo JIA",
+                                     "poly JIA RF+",
+                                     "poly JIA RF-",
+                                     "ERA",
+                                     "Psoriatic",
+                                     "Undifferentiated"))) %>%
+  mutate(across(c(outcome6, outcome12, outcome18, outcome24), factor, levels = as.character(c("0", "1")),
+                                                                     labels = c("active", "inactive")))
+
+# Inspect data again
+glimpse(db_correct)
+
+```
+
+```{r}
+
+# Number of patients in the dataset
+length(unique(db_correct$id))
+
+# Number of variables collected
+ncol(db_correct)
+
+```
+
+```{r warning=FALSE, message=FALSE}
+
+# Count number of missing values per variable
+missing_values <- db %>%
+  pivot_longer(everything(), names_to = "variable", values_to = "value") %>%
+  mutate(is_missing = is.na(value)) %>%
+  group_by(variable, is_missing) %>%
+  summarise(number = n()) %>%
+  group_by(variable) %>%
+  mutate(total = sum(number)) %>%
+  ungroup() %>%
+  mutate(percent = number / total * 100) %>%
+  ungroup()
+
+# Plot percentage missing values per variable
+missing_values %>%
+  ggplot(aes(x = variable , y = number, fill = is_missing)) +
+  geom_bar(stat = "identity", alpha = 0.9) +
+  coord_flip() +
+  scale_fill_lancet(name = "", labels = c("Present", "Missing")) +
+  labs(x = "Variable", y = "Number of missing values")
+
+# Plot missing values per patient id
+missing_row_plot <- db %>%
+  pivot_longer(-id, names_to = "variable", values_to = "value") %>%
+  mutate(is_missing = is.na(value)) %>%
+  mutate(id = as.numeric(id)) %>%
+  ggplot(aes(x = variable, y = id, fill = is_missing)) +
+  geom_raster(alpha = 0.9) +
+  scale_fill_lancet(name = "", labels = c("Present", "Missing")) +
+  labs(x = "Variable", y = "Patient id") +
+  coord_flip()
+
+missing_row_plot
+
+
+```
+
+* Create a baseline table with `CreateTableOne()` from the `tableone` package:
+  * Sex
+  * Age
+  * JIA subtype
+  * Number of active joints
+  * Number of limited joints
+  * PGA
+  * ESR
+  * VAS well-being
+* Create a table for the total group
+* Create a table comparing these baseline variables for patients who are and are not in remission at 6 months (`outcome6`)
+  * Use the appropriate tests to compare these groups (parametric or non-parametric)
+
+```{r}
+
+require(tableone)
+
+# Create final dataset of interest
+db_model <- db_correct %>%
+  select(age, sex, subtype, active, lim, pga, esr, VASwb, outcome6)
+
+# Create table 1
+table_1 <- CreateTableOne(
+  vars = c("age", "sex", "subtype", 
+           "active", "lim", "pga", "esr", "VASwb"),
+  data = db_model,
+  strata = "outcome6",
+  test = TRUE,
+  addOverall = TRUE
+)
+
+# Print table one with correct statistical test for each variable
+print(table_1, nonnormal = c("age", "active", "lim", "pga", "esr", "VASwb"))
+
+```
+
+* Create a logistic regression model to predict the outcome at 6, 12, 18 or 24 months (choose any outcome)
+  * Show a summary of model characteristics
+
+```{r}
+
+# Create logistic regression model
+model <- glm(outcome6 ~ ., family = "binomial", data = db_model)
+
+# Show summary of model
+summary(model)
+
+```
+
+* Create a table with model coefficients, Odds Ratio's (and 95% confidence intervals)
+
+```{r}
+
+# Coefficients, Odds Ratio's and 95% CI
+model_parameters <- tibble(Coefficients = names(coef(model)),
+                           Estimate = coef(model),
+                           OR = exp(coef(model)),
+                           Lower_95_CI = exp(confint.default(model))[,1],
+                           Upper_95_CI = exp(confint.default(model))[,2])
+
+model_parameters
+
+```
+
+* Check model assumptions:
+  * Linear relationship between predictors and logit of the outcome
+  
+```{r}
+
+# Example: check if number of limited joints is linearly related to the log odds of the outcome at 6 months
+
+# Find quartiles of number of limited joints
+quartile_lim <- quantile(db_model$lim, na.rm = TRUE)
+
+# Divide number of limited joints in quartiles and find median number of limited joints per group + probability of the outcome in each group
+# Calculate logit of the outcome in each group
+db_linearity_lim <- db_model %>%
+  mutate(lim_cut = cut(lim, breaks = quartile_lim, include.lowest = TRUE)) %>%
+  group_by(lim_cut) %>%
+  summarise(prob_outcome = mean(outcome6 == 'inactive', na.rm = TRUE),
+            median_lim = median(lim, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(logit = prob_outcome / (1-prob_outcome)) %>%
+  drop_na()
+
+# Plot median of each group against the logit of the outcome
+ggplot(data = db_linearity_lim, aes(x = median_lim, y = logit)) +
+  geom_point() +
+  labs(x = "Number of limited joints",
+       y = "Log-odds of inactive disease ") + 
+  theme_bw()
+
+```
+
+* Check influential observations / outliers
+
+```{r}
+
+model_data <- augment(model)
+
+# Cook's distance
+ggplot(model_data, aes(x = as.numeric(.rownames), y = .cooksd)) +
+  geom_point(alpha = 0.6) +
+  geom_label(data = model_data %>% filter(.cooksd > (5 / nobs(model))), aes(x = as.numeric(.rownames), y = .cooksd, label = .rownames)) +
+  labs(y = "Cook's Distance",
+       x = "Patient id") +
+  theme_bw()
+
+```
+
+* Check standardised residuals
+
+```{r}
+
+# Standardized residuals
+ggplot(model_data, aes(x = as.numeric(.rownames), y = .std.resid)) +
+  geom_point(aes(colour = outcome6), alpha = 0.6) +
+  labs(x = "Patient id",
+       y = "Standardised Residuals") +
+  scale_colour_manual(name = "Outcome", values = c("red", "blue"), labels = c("active", "inactive")) +
+  theme_bw()
+
+```
+
+
+* Create a confusion matrix of model predictions
+
+```{r}
+
+confusion_table <- db_model %>%
+  mutate(pred = predict(model, newdata = db_model, type = 'response')) %>%
+  mutate(pred_class = factor(ifelse(pred > 0.5, "inactive", "active"))) %>%
+  mutate(obs_class = outcome6)
+
+table(confusion_table$pred_class, confusion_table$obs_class, useNA = "no", dnn = c("Predicted", "Observed"))
+
+```
+
+```{r}
+
+# Confusion matrix from the caret package (easy way to get confusion matrix with some statistics)
+require(caret)
+
+confusionMatrix(confusion_table$pred_class, reference = confusion_table$obs_class, 
+                positive = "inactive") 
+
+```
+                
+                
+        
